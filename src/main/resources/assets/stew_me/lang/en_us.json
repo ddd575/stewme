@@ -1,0 +1,7 @@
+{
+  "itemGroup.stew_me": "Stew Me",
+  "item.stew_me.example_item": "Example Item",
+  "item.stew_me.mystery_stew": "Mystery Stew",
+  "item.stew_me.mystery_stew.lore.title": "§6Effect List:",
+  "message.stew_me.use_bowl_instead": "§aPlease use a bowl instead"
+}

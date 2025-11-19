@@ -1,0 +1,9 @@
+{
+  "itemGroup.stew_me": "铁锅炖自己",
+  "block.stew_me.example_block": "示例方块",
+  "item.stew_me.mystery_stew": "谜之炖菜",
+  "item.stew_me.mystery_stew.lore.title": "§6效果列表:",
+
+  "message.stew_me.use_bowl_instead": "§a还是用碗装吧"
+
+}
