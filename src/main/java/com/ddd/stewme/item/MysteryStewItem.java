@@ -27,7 +27,8 @@ import java.util.Map;
  * 自定义谜之炖菜物品，食用时应用存储的效果
  * 效果数据直接存储在Lore中，使用注册名进行解析
  * 更新：移除所有Logger输出
- * 更新：Lore显示格式为"效果名字 罗马数字 时间"，颜色根据效果分类区分
+ * 更新：Lore显示格式为"效果名字 等级显示 时间"，颜色根据效果分类区分
+ * 更新：支持最高255的等级，1-10使用罗马数字，超过10使用数字显示
  */
 public class MysteryStewItem extends Item {
 
@@ -60,7 +61,7 @@ public class MysteryStewItem extends Item {
 
     /**
      * 从Lore中解析效果数据
-     * 新格式：效果名字 罗马数字 时间 §7[注册名]
+     * 新格式：效果名字 等级显示 时间 §7[注册名]
      */
     private Map<Holder<MobEffect>, EffectData> getEffectsFromLore(ItemStack stack) {
         Map<Holder<MobEffect>, EffectData> effects = new HashMap<>();
@@ -72,7 +73,7 @@ public class MysteryStewItem extends Item {
             for (Component line : lines) {
                 String lineText = line.getString();
 
-                // 解析效果行，格式: "效果名字 罗马数字 时间 §7[注册名]"
+                // 解析效果行，格式: "效果名字 等级显示 时间 §7[注册名]"
                 if (lineText.contains("§7[") && lineText.contains("]")) {
                     // 提取注册名（在方括号中）
                     int startIndex = lineText.lastIndexOf("§7[") + 3;
@@ -80,7 +81,7 @@ public class MysteryStewItem extends Item {
                     if (startIndex > 2 && endIndex > startIndex) {
                         String regName = lineText.substring(startIndex, endIndex);
 
-                        // 解析罗马数字等级和时间
+                        // 解析等级和时间
                         int level = 0;
                         int time = 0;
 
@@ -89,13 +90,18 @@ public class MysteryStewItem extends Item {
                             ResourceLocation effectId = ResourceLocation.parse(regName);
                             MobEffect effect = BuiltInRegistries.MOB_EFFECT.get(effectId);
                             if (effect != null) {
-                                // 提取罗马数字并转换为等级
+                                // 提取等级显示部分
                                 String[] parts = lineText.split(" ");
                                 if (parts.length >= 3) {
-                                    // 寻找罗马数字部分（通常在效果名称后面）
+                                    // 寻找等级显示部分（通常在效果名称后面）
                                     for (int i = 0; i < parts.length; i++) {
-                                        if (isRomanNumeral(parts[i])) {
-                                            level = romanToInt(parts[i]) - 1; // 罗马数字从I开始，等级从0开始
+                                        String part = parts[i].replace("§a", "").replace("§c", "").replace("§7", "");
+                                        if (isRomanNumeral(part) || isNumeric(part)) {
+                                            if (isRomanNumeral(part)) {
+                                                level = romanToInt(part) - 1; // 罗马数字从I开始，等级从0开始
+                                            } else {
+                                                level = Integer.parseInt(part) - 1; // 数字显示，同样减1
+                                            }
                                             if (level < 0) level = 0;
                                             break;
                                         }
@@ -103,8 +109,9 @@ public class MysteryStewItem extends Item {
 
                                     // 提取时间（MM:SS格式）
                                     for (int i = 0; i < parts.length; i++) {
-                                        if (parts[i].contains(":") && parts[i].length() == 5) {
-                                            String[] timeParts = parts[i].split(":");
+                                        String part = parts[i].replace("§a", "").replace("§c", "").replace("§7", "");
+                                        if (part.contains(":") && part.length() == 5) {
+                                            String[] timeParts = part.split(":");
                                             if (timeParts.length == 2) {
                                                 try {
                                                     int minutes = Integer.parseInt(timeParts[0]);
@@ -134,8 +141,9 @@ public class MysteryStewItem extends Item {
     }
 
     /**
-     * 创建炖菜物品并设置显示名称和Lore（新格式：效果名字 罗马数字 时间）
+     * 创建炖菜物品并设置显示名称和Lore（新格式：效果名字 等级显示 时间）
      * 颜色根据效果分类：有益-绿色，有害-红色，中性-灰色
+     * 等级显示：1-10使用罗马数字，超过10使用阿拉伯数字
      */
     public static ItemStack createMysteryStew(Map<Holder<MobEffect>, CauldronData.EffectData> effects) {
         ItemStack stack = new ItemStack(com.ddd.stewme.Registry.MYSTERY_STEW_ITEM.get());
@@ -160,8 +168,9 @@ public class MysteryStewItem extends Item {
             // 获取效果的注册名
             String effectRegName = BuiltInRegistries.MOB_EFFECT.getKey(effect.value()).toString();
 
-            // 转换为罗马数字（等级+1，因为等级0显示为I）
-            String romanNumeral = intToRoman(effectData.level + 1);
+            // 转换为等级显示（等级+1，因为等级0显示为1）
+            int displayLevel = effectData.level + 1;
+            String levelDisplay = getLevelDisplay(displayLevel);
 
             // 格式化时间（MM:SS）
             int totalSeconds = effectData.time / 20;
@@ -172,9 +181,9 @@ public class MysteryStewItem extends Item {
             // 根据效果分类选择颜色
             String colorCode = getColorForEffect(effect.value());
 
-            // 构建效果行：颜色 + 效果名字 + 空格 + 罗马数字 + 空格 + 时间 + §7[注册名]
+            // 构建效果行：颜色 + 效果名字 + 空格 + 等级显示 + 空格 + 时间 + §7[注册名]
             String effectLine = String.format("%s%s %s %s §7[%s]",
-                    colorCode, effectName, romanNumeral, timeFormatted, effectRegName);
+                    colorCode, effectName, levelDisplay, timeFormatted, effectRegName);
             loreLines.add(Component.literal(effectLine));
         }
 
@@ -205,11 +214,24 @@ public class MysteryStewItem extends Item {
     }
 
     /**
-     * 将整数转换为罗马数字
+     * 获取等级显示字符串
+     * 1-10：使用罗马数字
+     * 超过10：使用阿拉伯数字
+     */
+    private static String getLevelDisplay(int level) {
+        if (level >= 1 && level <= 10) {
+            return intToRoman(level);
+        } else {
+            return String.valueOf(level);
+        }
+    }
+
+    /**
+     * 将整数转换为罗马数字（1-10）
      */
     private static String intToRoman(int num) {
         if (num < 1 || num > 10) {
-            return String.valueOf(num); // 超出范围返回数字
+            return String.valueOf(num);
         }
 
         String[] romanNumerals = {"I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"};
@@ -240,6 +262,13 @@ public class MysteryStewItem extends Item {
      */
     private static boolean isRomanNumeral(String str) {
         return str.matches("^[IVX]+$");
+    }
+
+    /**
+     * 检查字符串是否为数字
+     */
+    private static boolean isNumeric(String str) {
+        return str.matches("\\d+");
     }
 
     /**
